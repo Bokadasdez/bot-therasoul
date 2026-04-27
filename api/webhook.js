@@ -1,13 +1,22 @@
 export default async function (req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
+  const body = req.body;
+
+  // ESTA LINHA É A MAIS IMPORTANTE: 
+  // Se a mensagem veio do próprio bot (fromMe), ignora e encerra aqui.
+  if (body.fromMe === true || body.isGroup === true) {
+    return res.status(200).json({ status: 'ignored' });
+  }
+
+  // Responde 200 imediatamente para a Z-API não tentar reenviar por "timeout"
+  res.status(200).json({ status: 'received' });
+
   try {
-    const body = req.body;
-    const userMessage = body.text?.message || body.text || "Olá";
+    const userMessage = body.text?.message || body.text;
     const rawPhone = body.phone || body.connectedPhone || body.data?.phone || body.sender?.phone;
 
-    if (!rawPhone) return res.status(200).json({ status: 'no_phone' });
-
+    if (!rawPhone || !userMessage) return;
     const targetPhone = String(rawPhone).replace(/\D/g, '');
 
     // Chamada OpenAI
@@ -19,7 +28,10 @@ export default async function (req, res) {
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: String(userMessage) }],
+        messages: [
+          { role: 'system', content: 'Você é o assistente do Therasoul. Seja breve.' },
+          { role: 'user', content: String(userMessage) }
+        ],
       }),
     });
 
@@ -36,9 +48,7 @@ export default async function (req, res) {
       body: JSON.stringify({ phone: targetPhone, message: botReply }),
     });
 
-    return res.status(200).json({ status: 'success' });
   } catch (error) {
-    console.error('ERRO:', error.message);
-    return res.status(500).json({ error: error.message });
+    console.error('Erro:', error.message);
   }
 }
