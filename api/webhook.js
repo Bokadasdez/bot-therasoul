@@ -1,38 +1,39 @@
-const axios = require('axios');
-const { OpenAI } = require('openai');
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Método Não Permitido' });
+  }
 
-module.exports = async (req, res) => {
-    // Só aceita chamadas do tipo POST (que é o que a Z-API envia)
-    if (req.method !== 'POST') {
-        return res.status(405).send('Método Não Permitido');
-    }
+  try {
+    const { text, connectedPhone } = req.body;
+    
+    // Pega apenas o texto da mensagem, independente do formato
+    const userMessage = text?.message || text || "Oi";
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [{ role: 'user', content: String(userMessage) }],
+      }),
+    });
 
-    try {
-        // Extraindo os dados que a Z-API envia
-        const { text, phone } = req.body; 
+    const data = await response.json();
+    const botReply = data.choices[0].message.content;
 
-        // 1. Pergunta para a OpenAI (GPT-4o-mini)
-        const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-                { role: "system", content: "Você é o Therasoul, um assistente inteligente e empático." },
-                { role: "user", content: text }
-            ],
-        });
+    // Envia de volta para o WhatsApp via Z-API
+    await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: connectedPhone, message: botReply }),
+    });
 
-        const respostaIA = completion.choices[0].message.content;
-
-        // 2. Envia a resposta de volta para o WhatsApp via Z-API
-        await axios.post(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
-            phone: phone,
-            text: respostaIA
-        });
-
-        res.status(200).send('Mensagem processada com sucesso!');
-    } catch (error) {
-        console.error('Erro no Webhook:', error.message);
-        res.status(500).json({ error: 'Erro interno ao processar mensagem' });
-    }
-};
+    res.status(200).json({ status: 'Sucesso' });
+  } catch (error) {
+    console.error('Erro no Webhook:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
