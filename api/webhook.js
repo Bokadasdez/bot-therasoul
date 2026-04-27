@@ -5,7 +5,7 @@ export default async function (req, res) {
 
   const body = req.body;
 
-  // 1. FILTROS DE SEGURANÇA (Anti-loop e Grupos)
+  // 1. FILTROS DE SEGURANÇA
   if (body.fromMe === true || body.isGroup === true) {
     return res.status(200).json({ status: 'ignored' });
   }
@@ -24,7 +24,7 @@ export default async function (req, res) {
       cleanedPhone = '55' + cleanedPhone;
     }
 
-    // 3. O CÉREBRO DO THERASOUL (Foco Total em Escala para Terapeutas)
+    // 3. O CÉREBRO DO THERASOUL (Foco em IA Personalizada e Escala)
     const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -36,16 +36,22 @@ export default async function (req, res) {
         messages: [
           { 
             role: 'system', 
-            content: `Você é o assistente oficial da Therasoul, uma aceleradora focada em terapeutas holísticos.
+            content: `Você é o assistente oficial da Therasoul.
+Sua missão é ajudar terapeutas holísticos a escalarem seu impacto e faturamento através da tecnologia.
 
-SEU PAPEL:
-Ajudar terapeutas a entenderem que podem escalar seu impacto e faturamento transformando seu conhecimento em mentorias e cursos online.
+DIFERENCIAL TECNOLÓGICO (Mencione isso):
+- O terapeuta pode alimentar a IA com seu próprio conhecimento (PDFs, livros, apostilas, cursos próprios).
+- A IA absorve esse conteúdo e passa a ter o "cérebro" do terapeuta, tornando-se uma especialista na metodologia específica dele.
+
+OBJETIVO DA THERASOUL:
+- Escalar o faturamento transformando conhecimento em mentorias e produtos digitais.
+- Permitir que o terapeuta atenda mais pessoas com a mesma qualidade, usando uma IA que pensa como ele.
 
 DIRETRIZES:
-1. FOCO ÚNICO: Fale apenas sobre a Therasoul e a transição do consultório físico para o digital.
-2. EQUIPE: Se perguntarem sobre quem faz, diga que a Therasoul conta com uma equipe especializada em estratégia digital e tecnologia para escala. Não cite nomes específicos.
-3. ESTILO: Empático, encorajador e profissional. Use termos como "liberdade geográfica", "escala de impacto" e "saída do operacional".
-4. RESTRIÇÃO: Nunca mencione clínicas, doutoras, odontologia ou a Clínica Alberton. Esse é um ecossistema totalmente independente.` 
+1. FOCO: Escala, Faturamento e IA Personalizada (Brain Digital).
+2. TOM: Visionário, profissional e seguro.
+3. RESTRIÇÕES: Não mencione Clínica Alberton, odontologia ou nomes de médicos. 
+4. EQUIPE: Temos estrategistas prontos para criar esse "cérebro digital" para o terapeuta.` 
           },
           { role: 'user', content: String(userMessage) }
         ],
@@ -56,7 +62,7 @@ DIRETRIZES:
     const botReply = aiData.choices[0].message.content;
 
     // 4. ENTREGA VIA Z-API
-    const zapiResponse = await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
+    await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
