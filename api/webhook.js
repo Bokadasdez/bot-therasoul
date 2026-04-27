@@ -1,3 +1,4 @@
+import fetch from 'node-fetch';
 export default async function (req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
