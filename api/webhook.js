@@ -1,26 +1,21 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método Não Permitido' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
 
   try {
-    // A Z-API pode enviar o telefone em vários lugares diferentes
     const body = req.body;
     const userMessage = body.text?.message || body.text || "Oi";
-    
-    // Tenta pegar o telefone de todas as formas possíveis
     const rawPhone = body.phone || body.connectedPhone || body.data?.phone || body.sender?.phone;
 
     if (!rawPhone) {
-       console.error("Telefone não encontrado no corpo da requisição");
-       return res.status(200).json({ status: 'Sem telefone' });
+      console.log("LOG: Telefone não encontrado no corpo da mensagem.");
+      return res.status(200).json({ status: 'sem_telefone' });
     }
 
-    // Limpa o número (deixa só dígitos)
     const targetPhone = String(rawPhone).replace(/\D/g, '');
+    console.log(`LOG: Tentando responder para o número: ${targetPhone}`);
 
-    // Chamada para OpenAI
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Chamada OpenAI
+    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
@@ -32,22 +27,22 @@ export default async function handler(req, res) {
       }),
     });
 
-    const data = await response.json();
-    const botReply = data.choices[0].message.content;
+    const aiData = await aiResponse.json();
+    const botReply = aiData.choices[0].message.content;
 
-    // Envia para a Z-API
-    await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
+    // Chamada Z-API com LOG de resposta
+    const zapiResponse = await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        phone: targetPhone, 
-        message: botReply 
-      }),
+      body: JSON.stringify({ phone: targetPhone, message: botReply }),
     });
 
-    res.status(200).json({ status: 'Sucesso' });
+    const zapiResult = await zapiResponse.json();
+    console.log("LOG: Resposta da Z-API:", JSON.stringify(zapiResult));
+
+    res.status(200).json({ status: 'sucesso', zapi: zapiResult });
   } catch (error) {
-    console.error('Erro:', error.message);
+    console.error('LOG: Erro no processo:', error.message);
     res.status(500).json({ error: error.message });
   }
 }
