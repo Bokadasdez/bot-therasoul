@@ -30,19 +30,15 @@ export default async function handler(req, res) {
     const aiData = await aiResponse.json();
     const botReply = aiData.choices[0].message.content;
 
-    // Chamada Z-API com LOG de resposta
-    const zapiResponse = await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
+   // Envia para a Z-API com a segurança que você ativou
+    await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: targetPhone, message: botReply }),
+      headers: { 
+        'Content-Type': 'application/json',
+        'Client-Token': process.env.Z_API_CLIENT_TOKEN // O segredo da segurança
+      },
+      body: JSON.stringify({ 
+        phone: targetPhone, 
+        message: botReply 
+      }),
     });
-
-    const zapiResult = await zapiResponse.json();
-    console.log("LOG: Resposta da Z-API:", JSON.stringify(zapiResult));
-
-    res.status(200).json({ status: 'sucesso', zapi: zapiResult });
-  } catch (error) {
-    console.error('LOG: Erro no processo:', error.message);
-    res.status(500).json({ error: error.message });
-  }
-}
