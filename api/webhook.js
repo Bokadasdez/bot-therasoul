@@ -1,18 +1,14 @@
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' });
+export default async function (req, res) {
+  if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
   try {
     const body = req.body;
-    const userMessage = body.text?.message || body.text || "Oi";
+    const userMessage = body.text?.message || body.text || "Olá";
     const rawPhone = body.phone || body.connectedPhone || body.data?.phone || body.sender?.phone;
 
-    if (!rawPhone) {
-      console.log("LOG: Telefone não encontrado no corpo da mensagem.");
-      return res.status(200).json({ status: 'sem_telefone' });
-    }
+    if (!rawPhone) return res.status(200).json({ status: 'no_phone' });
 
     const targetPhone = String(rawPhone).replace(/\D/g, '');
-    console.log(`LOG: Tentando responder para o número: ${targetPhone}`);
 
     // Chamada OpenAI
     const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -30,15 +26,19 @@ export default async function handler(req, res) {
     const aiData = await aiResponse.json();
     const botReply = aiData.choices[0].message.content;
 
-   // Envia para a Z-API com a segurança que você ativou
+    // Envia para a Z-API
     await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        'Client-Token': process.env.Z_API_CLIENT_TOKEN // O segredo da segurança
+        'Client-Token': process.env.Z_API_CLIENT_TOKEN 
       },
-      body: JSON.stringify({ 
-        phone: targetPhone, 
-        message: botReply 
-      }),
+      body: JSON.stringify({ phone: targetPhone, message: botReply }),
     });
+
+    return res.status(200).json({ status: 'success' });
+  } catch (error) {
+    console.error('ERRO:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+}
