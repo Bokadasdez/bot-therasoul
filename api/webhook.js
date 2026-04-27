@@ -5,22 +5,24 @@ export default async function (req, res) {
 
   const body = req.body;
 
-  // Ignora se for do próprio bot ou grupo
+  // 1. Filtro de segurança contra loops
   if (body.fromMe === true || body.isGroup === true) {
     return res.status(200).json({ status: 'ignored' });
   }
 
-  // Avisa a Z-API que recebeu (importante para evitar reenvios)
+  // 2. Resposta rápida para a Z-API
   res.status(200).json({ status: 'received' });
 
   try {
     const userMessage = body.text?.message || body.text;
-    const rawPhone = body.phone || body.connectedPhone || body.data?.phone || body.sender?.phone;
+    let rawPhone = body.phone || body.connectedPhone || body.data?.phone;
 
     if (!rawPhone || !userMessage) return;
-    const targetPhone = String(rawPhone).replace(/\D/g, '');
 
-    // Chamada OpenAI
+    // 3. Limpeza rigorosa do número (Remove tudo que não é número)
+    let targetPhone = String(rawPhone).replace(/\D/g, '');
+
+    // 4. Chamada OpenAI (Onde seu saldo está sendo usado)
     const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -30,37 +32,32 @@ export default async function (req, res) {
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [
-          { role: 'system', content: 'Você é o assistente do Therasoul. Responda de forma curta.' },
+          { role: 'system', content: 'Você é o assistente do Therasoul. Responda de forma breve e direta.' },
           { role: 'user', content: String(userMessage) }
         ],
       }),
     });
 
-    if (!aiResponse.ok) {
-      const errorData = await aiResponse.text();
-      console.error('Erro OpenAI:', errorData);
-      return;
-    }
-
     const aiData = await aiResponse.json();
     const botReply = aiData.choices[0].message.content;
 
-    // Envia para a Z-API
+    // 5. Envio para a Z-API com tratamento de erro visível
     const zapiResponse = await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'Client-Token': process.env.Z_API_CLIENT_TOKEN 
       },
-      body: JSON.stringify({ phone: targetPhone, message: botReply }),
+      body: JSON.stringify({ 
+        phone: targetPhone, 
+        message: botReply 
+      }),
     });
 
-    if (!zapiResponse.ok) {
-      const zapiError = await zapiResponse.text();
-      console.error('Erro Z-API:', zapiError);
-    }
+    const zapiResult = await zapiResponse.json();
+    console.log('LOG FINAL Z-API:', JSON.stringify(zapiResult));
 
   } catch (error) {
-    console.error('ERRO DE CONEXÃO:', error.message);
+    console.error('ERRO NO FLUXO:', error.message);
   }
 }
