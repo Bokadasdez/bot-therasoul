@@ -41,16 +41,18 @@ export default async function handler(req, res) {
 
     const botReply = openAiData.choices[0].message.content;
 
-    // Envia de volta para o WhatsApp via Z-API
-    const zapiResponse = await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
+  // Envia de volta para o WhatsApp via Z-API
+    // Tentamos pegar o telefone de onde quer que ele esteja no pacote
+    const targetPhone = req.body.phone || req.body.connectedPhone || (req.body.data && req.body.data.phone);
+
+    await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        phone: connectedPhone || req.body.phone, 
+        phone: targetPhone, 
         message: botReply 
       }),
     });
-
     res.status(200).json({ status: 'Sucesso' });
   } catch (error) {
     console.error('Erro detalhado:', error.message);
