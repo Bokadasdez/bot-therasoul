@@ -14,18 +14,17 @@ export default async function (req, res) {
     const userMessage = body.text?.message || body.text;
     let rawPhone = body.phone || body.connectedPhone || body.data?.phone;
 
-    // Ignora mensagens vazias, muito curtas ou formatos não suportados
     if (!rawPhone || !userMessage || userMessage.length < 2) {
       return res.status(200).json({ status: 'no_data_or_too_short' });
     }
 
-    // 2. FORMATAÇÃO DO NÚMERO (Garante 55 + limpeza)
+    // 2. FORMATAÇÃO DO NÚMERO
     let cleanedPhone = String(rawPhone).replace(/\D/g, '');
     if (!cleanedPhone.startsWith('55')) {
       cleanedPhone = '55' + cleanedPhone;
     }
 
-    // 3. O CÉREBRO DO THERASOUL (Ajustado para Especialista em Escala Digital)
+    // 3. O CÉREBRO DO THERASOUL (Foco Total em Escala para Terapeutas)
     const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -37,16 +36,16 @@ export default async function (req, res) {
         messages: [
           { 
             role: 'system', 
-            content: `Você é o assistente oficial da Therasoul.
-Seu foco exclusivo é ajudar terapeutas holísticos a transformarem seu conhecimento em produtos digitais escaláveis (cursos, mentorias e plataformas).
+            content: `Você é o assistente oficial da Therasoul, uma aceleradora focada em terapeutas holísticos.
 
-DIRETRIZES DE ATENDIMENTO:
-1. FOCO: Therasoul é uma aceleradora de conhecimento para terapeutas. Não mencione clínicas, consultórios médicos ou outros negócios de saúde física.
-2. ESPECIALISTAS: Se mencionar equipe técnica ou estratégica, diga que a Therasoul conta com especialistas como Vick e Simone para estruturar toda a presença digital do terapeuta.
-3. ESTILO: Profissional, empático e visionário. Use uma linguagem que ressoe com o público holístico (equilíbrio, propósito, energia), mas com foco pragmático em resultados de negócio (escala, automação, liberdade de tempo).
-4. OBJETIVO: Conduzir o terapeuta a entender que ele não precisa ficar preso apenas à agenda de atendimentos individuais para crescer.
+SEU PAPEL:
+Ajudar terapeutas a entenderem que podem escalar seu impacto e faturamento transformando seu conhecimento em mentorias e cursos online.
 
-IMPORTANTE: Nunca mencione "Clínica Alberton" ou assuntos de odontologia. O foco é 100% na jornada digital e na escala do terapeuta com a Therasoul.` 
+DIRETRIZES:
+1. FOCO ÚNICO: Fale apenas sobre a Therasoul e a transição do consultório físico para o digital.
+2. EQUIPE: Se perguntarem sobre quem faz, diga que a Therasoul conta com uma equipe especializada em estratégia digital e tecnologia para escala. Não cite nomes específicos.
+3. ESTILO: Empático, encorajador e profissional. Use termos como "liberdade geográfica", "escala de impacto" e "saída do operacional".
+4. RESTRIÇÃO: Nunca mencione clínicas, doutoras, odontologia ou a Clínica Alberton. Esse é um ecossistema totalmente independente.` 
           },
           { role: 'user', content: String(userMessage) }
         ],
@@ -65,9 +64,6 @@ IMPORTANTE: Nunca mencione "Clínica Alberton" ou assuntos de odontologia. O foc
       },
       body: JSON.stringify({ phone: cleanedPhone, message: botReply }),
     });
-
-    const zapiResult = await zapiResponse.json();
-    console.log('Therasoul Enviou:', zapiResult);
 
     return res.status(200).json({ status: 'success' });
 
