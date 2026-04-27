@@ -4,10 +4,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { text, connectedPhone } = req.body;
+    const { text, connectedPhone, data } = req.body;
     
-    // Pega apenas o texto da mensagem, independente do formato
-    const userMessage = text?.message || text || "Oi";
+    // Captura o texto de diferentes formatos que a Z-API pode enviar
+    let userMessage = "";
+    if (text && typeof text === 'object') {
+      userMessage = text.message || "";
+    } else if (typeof text === 'string') {
+      userMessage = text;
+    } else if (data && data.text) {
+      userMessage = data.text;
+    }
+
+    // Se a mensagem ainda estiver vazia, define um padrão para não dar erro 400
+    if (!userMessage || userMessage === "") {
+      userMessage = "Olá";
+    }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -21,19 +33,27 @@ export default async function handler(req, res) {
       }),
     });
 
-    const data = await response.json();
-    const botReply = data.choices[0].message.content;
+    const openAiData = await response.json();
+    
+    if (!openAiData.choices) {
+      throw new Error(JSON.stringify(openAiData));
+    }
+
+    const botReply = openAiData.choices[0].message.content;
 
     // Envia de volta para o WhatsApp via Z-API
-    await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
+    const zapiResponse = await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: connectedPhone, message: botReply }),
+      body: JSON.stringify({ 
+        phone: connectedPhone || req.body.phone, 
+        message: botReply 
+      }),
     });
 
     res.status(200).json({ status: 'Sucesso' });
   } catch (error) {
-    console.error('Erro no Webhook:', error);
+    console.error('Erro detalhado:', error.message);
     res.status(500).json({ error: error.message });
   }
 }
