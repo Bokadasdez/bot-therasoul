@@ -4,25 +4,21 @@ export default async function (req, res) {
   if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
   const body = req.body;
-
-  // 1. Filtro de segurança contra loops
   if (body.fromMe === true || body.isGroup === true) {
     return res.status(200).json({ status: 'ignored' });
   }
-
-  // 2. Resposta rápida para a Z-API
-  res.status(200).json({ status: 'received' });
 
   try {
     const userMessage = body.text?.message || body.text;
     let rawPhone = body.phone || body.connectedPhone || body.data?.phone;
 
-    if (!rawPhone || !userMessage) return;
+    if (!rawPhone || !userMessage) {
+        return res.status(200).json({ status: 'no_data' });
+    }
 
-    // 3. Limpeza rigorosa do número (Remove tudo que não é número)
-    let targetPhone = String(rawPhone).replace(/\D/g, '');
+    const targetPhone = String(rawPhone).replace(/\D/g, '');
 
-    // 4. Chamada OpenAI (Onde seu saldo está sendo usado)
+    // 1. CHAMA A OPENAI
     const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -32,7 +28,7 @@ export default async function (req, res) {
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
         messages: [
-          { role: 'system', content: 'Você é o assistente do Therasoul. Responda de forma breve e direta.' },
+          { role: 'system', content: 'Você é o assistente do Therasoul. Responda de forma curta.' },
           { role: 'user', content: String(userMessage) }
         ],
       }),
@@ -41,23 +37,24 @@ export default async function (req, res) {
     const aiData = await aiResponse.json();
     const botReply = aiData.choices[0].message.content;
 
-    // 5. Envio para a Z-API com tratamento de erro visível
+    // 2. ENVIA PARA A Z-API E ESPERA A RESPOSTA (AQUI É O SEGREDO)
     const zapiResponse = await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
         'Client-Token': process.env.Z_API_CLIENT_TOKEN 
       },
-      body: JSON.stringify({ 
-        phone: targetPhone, 
-        message: botReply 
-      }),
+      body: JSON.stringify({ phone: targetPhone, message: botReply }),
     });
 
     const zapiResult = await zapiResponse.json();
-    console.log('LOG FINAL Z-API:', JSON.stringify(zapiResult));
+    
+    // 3. SÓ RESPONDE A VERCEL DEPOIS QUE A Z-API CONFIRMAR
+    console.log('RESPOSTA DA Z-API:', JSON.stringify(zapiResult));
+    return res.status(200).json(zapiResult);
 
   } catch (error) {
-    console.error('ERRO NO FLUXO:', error.message);
+    console.error('ERRO CRÍTICO:', error.message);
+    return res.status(500).json({ error: error.message });
   }
 }
