@@ -4,23 +4,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { text, connectedPhone, data } = req.body;
+    // A Z-API pode enviar o telefone em vários lugares diferentes
+    const body = req.body;
+    const userMessage = body.text?.message || body.text || "Oi";
     
-    // Captura o texto de diferentes formatos que a Z-API pode enviar
-    let userMessage = "";
-    if (text && typeof text === 'object') {
-      userMessage = text.message || "";
-    } else if (typeof text === 'string') {
-      userMessage = text;
-    } else if (data && data.text) {
-      userMessage = data.text;
+    // Tenta pegar o telefone de todas as formas possíveis
+    const rawPhone = body.phone || body.connectedPhone || body.data?.phone || body.sender?.phone;
+
+    if (!rawPhone) {
+       console.error("Telefone não encontrado no corpo da requisição");
+       return res.status(200).json({ status: 'Sem telefone' });
     }
 
-    // Se a mensagem ainda estiver vazia, define um padrão para não dar erro 400
-    if (!userMessage || userMessage === "") {
-      userMessage = "Olá";
-    }
+    // Limpa o número (deixa só dígitos)
+    const targetPhone = String(rawPhone).replace(/\D/g, '');
 
+    // Chamada para OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -33,18 +32,10 @@ export default async function handler(req, res) {
       }),
     });
 
-    const openAiData = await response.json();
-    
-    if (!openAiData.choices) {
-      throw new Error(JSON.stringify(openAiData));
-    }
+    const data = await response.json();
+    const botReply = data.choices[0].message.content;
 
-    const botReply = openAiData.choices[0].message.content;
-
-  // Envia de volta para o WhatsApp via Z-API
-    // Tentamos pegar o telefone de onde quer que ele esteja no pacote
-    const targetPhone = req.body.phone || req.body.connectedPhone || (req.body.data && req.body.data.phone);
-
+    // Envia para a Z-API
     await fetch(`https://api.z-api.io/instances/${process.env.Z_API_INSTANCE}/token/${process.env.Z_API_TOKEN}/send-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -53,9 +44,10 @@ export default async function handler(req, res) {
         message: botReply 
       }),
     });
+
     res.status(200).json({ status: 'Sucesso' });
   } catch (error) {
-    console.error('Erro detalhado:', error.message);
+    console.error('Erro:', error.message);
     res.status(500).json({ error: error.message });
   }
 }
